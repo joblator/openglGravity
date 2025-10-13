@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build OpenGL Project",
+      "type": "shell",
+      "command": "g++",
+      "args": [
+        "-g",
+        "-std=c++17",
+        "-I${workspaceFolder}/include",
+        "-L${workspaceFolder}/lib",
+        "${workspaceFolder}/src/*.cpp",
+        "${workspaceFolder}/src/glad.c",
+        "-lglfw3dll",
+        "-lopengl32",
+        "-o", "${workspaceFolder}/main.exe"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Run main.exe",
+      "type": "shell",
+      "command": "${workspaceFolder}/main.exe",
+      "dependsOn": "Build OpenGL Project",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "new"
+      }
+    }
+  ]
+}
