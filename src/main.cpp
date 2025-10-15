@@ -7,7 +7,7 @@ using namespace std;
 
 GLFWwindow* StartGLFW();
 int screenWidth = 800;
-int screenHeight = 600;
+int screenHeight = 1000;
 struct Ball
 {
     float x,y;
@@ -15,12 +15,13 @@ struct Ball
     float accelration ,velocity;
 
 
-
-    Ball(float xPos,float yPos ,float r,float accel,float vel){
+//TODO: change the pos vel and accel to vectors
+    Ball(float xPos,float yPos ,float r,float accel[2],float vel){
         x = xPos;
         y = yPos;
         radius = r;
-        accelration = accel;
+        accelration[0] = accel[0];
+        accelration[1] = accel[1];
         velocity = vel;
     }
     void drawBall(int res){ 
@@ -53,12 +54,39 @@ struct Ball
             y = screenHeight - radius;
         }
     }
+
+
+
+
     void moveBall(){
-        accelration -= 0.001f;
+        accelration -= 0.0001f;
         velocity += accelration;
         y += velocity;
     }
-    void collisionOther(Ball other);
+    
+    
+
+    void collisionOther(Ball other){
+        if(abs(y - other.y) < 2 * radius){
+            if( y > other.y){
+                float temp  = velocity;
+                y = other.y + (2 * radius);
+                velocity = 0.9f * velocity + 0.75f * other.velocity;
+                other.velocity =  0.9f * other.velocity + 0.75f * temp;
+            }
+            else{
+                float temp  = velocity;
+                other.y = y - (2 * radius);
+                velocity = 0.9f * velocity + 0.75f * other.velocity;
+                other.velocity =  0.9f * other.velocity + 0.75f * temp;
+            }     
+        }
+    }
+
+
+    void gravityForce(Ball other){
+        
+    }
 };
 
 
@@ -81,8 +109,9 @@ int main() {
     glLoadIdentity();
     glOrtho(0, screenWidth, 0, screenHeight, -1, 1);  // origin at bottom-left
     glMatrixMode(GL_MODELVIEW);
-    Ball ball = Ball(screenHeight/2.f,screenWidth/2.f,50.0f,0.0f,0.0f);
-    Ball ball1 = Ball(screenHeight/3.f,screenWidth/3.f,50.0f,0.0f,0.0f);
+    //ball(xpos,ypos,radius,accelration,velocity)
+    Ball ball = Ball(screenHeight/2.f,screenWidth/2.f,50.0f,{0.0f,0.0f},0.0f);
+    Ball ball1 = Ball(screenHeight/2.f ,0,50.0f,{0.0f,0.0f},5.0f);
 
     int res = 100;
     // the physics loop 
@@ -95,6 +124,7 @@ int main() {
         ball1.moveBall();
         ball.clampBall();
         ball1.clampBall();
+        ball.collisionOther(ball1);
         ball.drawBall(res);
         ball1.drawBall(res);
 
