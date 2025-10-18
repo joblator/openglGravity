@@ -2,89 +2,117 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <cmath>
+#include <vector>
 
 using namespace std;
 
 GLFWwindow* StartGLFW();
-int screenWidth = 800;
-int screenHeight = 1000;
+int screenWidth = 1440;
+int screenHeight = 2560;
 struct Ball
-{
-    float x,y;
+{   
+    // 0 = X , 1 = Y
+    vector<float> pos;
     float radius;
-    float accelration ,velocity;
+    vector<float> accelration ,velocity;
+    float mass;
 
 
-//TODO: change the pos vel and accel to vectors
-    Ball(float xPos,float yPos ,float r,float accel[2],float vel){
-        x = xPos;
-        y = yPos;
+    Ball(vector<float> Position,float r,vector<float> accel,vector<float> vel,float m){
         radius = r;
-        accelration[0] = accel[0];
-        accelration[1] = accel[1];
+        pos = Position;
+        accelration = accel;
         velocity = vel;
+        mass = m;
+        
     }
     void drawBall(int res){ 
         glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(x, y);  // center of circle
+        glVertex2f(pos[0], pos[1]);  // center of circle
 
         for (int i = 0; i <= res; i++) {
              // draws a triangle from the center of the circle each time at a diffrent angle 
             float angle = 2.0f * 3.141592653589f * (static_cast<float>(i) / res);
-            float x1 = x + cos(angle) * radius;
-            float y1 = y + sin(angle) * radius;
+            float x1 = pos[0] + cos(angle) * radius;
+            float y1 = pos[1] + sin(angle) * radius;
             glVertex2f(x1, y1);
         }
         glEnd();
     }
     void clampBall(){
-        if (x < radius){
-            x = radius;
+        if (pos[0] < radius){
+            pos[0] = radius;
+            velocity[0] *= -0.1f;
 
         }
-        if (x > screenWidth - radius){
-            x = screenWidth - radius;
+        if (pos[0] > screenWidth - radius){
+            pos[0] = screenWidth - radius;
+            velocity[0] *= -0.1f;
         }
-        if (y < radius){
-            y = radius;
-            velocity *= -0.7f;
-
+        if (pos[1] < radius){
+            pos[1] = radius;
+            velocity[1] *= -0.1f;
+            
         }
-        if (y > screenHeight - radius){
-            y = screenHeight - radius;
+        if (pos[1] > screenHeight - radius){
+            pos[1] = screenHeight - radius;
+            velocity[1] *= -0.1f;
         }
     }
 
 
 
 
-    void moveBall(){
-        accelration -= 0.0001f;
-        velocity += accelration;
-        y += velocity;
+    void accelerate(float x ,float y){
+        velocity[0] += x;
+        velocity[1] += y;
+    }
+    void move(){
+        pos[0] += velocity[0];
+        pos[1] += velocity[1];
     }
     
     
 
     void collisionOther(Ball other){
-        if(abs(y - other.y) < 2 * radius){
-            if( y > other.y){
-                float temp  = velocity;
-                y = other.y + (2 * radius);
-                velocity = 0.9f * velocity + 0.75f * other.velocity;
-                other.velocity =  0.9f * other.velocity + 0.75f * temp;
+        if(abs(pos[1] - other.pos[1] < 2 * radius)){
+            if( pos[1] > other.pos[1]){
+                float temp  = velocity[1];
+                pos[1] = other.pos[1] + (2 * radius);
+                velocity[1] = 0.9f * velocity[1] + 0.75f * other.velocity[1];
+                other.velocity[1] =  0.9f * other.velocity[1] + 0.75f * temp;
             }
             else{
-                float temp  = velocity;
-                other.y = y - (2 * radius);
-                velocity = 0.9f * velocity + 0.75f * other.velocity;
-                other.velocity =  0.9f * other.velocity + 0.75f * temp;
+                float temp  = velocity[1];
+                other.pos[1] = pos[1] - (2 * radius);
+                velocity[1] = 0.9f * velocity[1] + 0.75f * other.velocity[1];
+                other.velocity[1] =  0.9f * other.velocity[1] + 0.75f * temp;
             }     
         }
     }
 
 
-    void gravityForce(Ball other){
+    void gravityForce(Ball& other){
+        float G = 6.67f * pow(10,-14);
+        float deltaY = other.pos[1] - pos[1];
+        float deltaX = other.pos[0] - pos[0];
+        float distance = sqrt(pow(deltaX,2) + pow(deltaY,2));
+        cout << "distance: "<< distance << "\n";
+        if (distance > 100.f) {distance = 100.f;}
+
+
+        vector<float> direction = {deltaX / distance,deltaY/distance};//scaling the vector
+        float Gforce = (G * mass * other.mass ) / (distance * distance);
+        cout << "Gforce: "<< Gforce << "\n";
+        float accel = Gforce / mass;
+        float xAccel = 0.01f * direction[0] * accel;
+        float yAccel = 0.01f * direction[1] * accel;
+        cout << "directionY: "<< direction[1] << "\n";
+
+        cout << "xAccel: "<< xAccel << "\n";
+        cout << "yAccel "<< yAccel << "\n";
+
+        accelerate(xAccel,yAccel);
         
     }
 };
@@ -109,25 +137,46 @@ int main() {
     glLoadIdentity();
     glOrtho(0, screenWidth, 0, screenHeight, -1, 1);  // origin at bottom-left
     glMatrixMode(GL_MODELVIEW);
-    //ball(xpos,ypos,radius,accelration,velocity)
-    Ball ball = Ball(screenHeight/2.f,screenWidth/2.f,50.0f,{0.0f,0.0f},0.0f);
-    Ball ball1 = Ball(screenHeight/2.f ,0,50.0f,{0.0f,0.0f},5.0f);
+
+    float G = 6.67e-14f;
+    float M = 1e17f;
+    float orbitRadius = 300.0f;
+
+    float centerX = screenWidth / 2.0f;  // 720 
+    float centerY = screenHeight / 2.0f; // 1280
+
+    // Calculate orbital velocity magnitude for circular orbit
+    float velocityMag = sqrt(G * M / orbitRadius);
+    //ball(xpos,ypos,radius,accelration,velocity,mass)
+    Ball sun = Ball({centerX, centerY}, 30.0f, {0.0f, 0.0f}, {0.0f, 0.0f}, M);
+
+    // Planets positioned at 4 directions with tangential velocity for orbit
+    Ball planetRight = Ball({centerX + orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, velocityMag}, 1e14f);
+    Ball planetTop = Ball({centerX, centerY + orbitRadius}, 15.0f, {0.0f, 0.0f}, {-velocityMag, 0.0f}, 1e14f);
+    Ball planetLeft = Ball({centerX - orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, -velocityMag}, 1e14f);
+    Ball planetBottom = Ball({centerX, centerY - orbitRadius}, 15.0f, {0.0f, 0.0f}, {velocityMag, 0.0f}, 1e14f);
+
+    vector<Ball> balls = {sun, planetRight, planetTop, planetLeft, planetBottom};
+
+    
 
     int res = 100;
     // the physics loop 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT);//clears the color buffer (screen) 
         glLoadIdentity();
-
-        glColor3f(1.0f, 1.0f, 1.0f);  //rgb values between 0 and 1  
-        ball.moveBall();
-        ball1.moveBall();
-        ball.clampBall();
-        ball1.clampBall();
-        ball.collisionOther(ball1);
-        ball.drawBall(res);
-        ball1.drawBall(res);
-
+        for (auto& ball: balls){
+            ball.accelration[0] = 0.0f;
+            ball.accelration[1] = 0.0f;
+            for(auto& ball2 : balls){
+                if(&ball == &ball2){continue;}
+                ball.gravityForce(ball2);
+            }
+            glColor3f(1.0f, 1.0f, 1.0f); 
+            ball.move();
+            ball.clampBall();
+            ball.drawBall(res);
+        }
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
