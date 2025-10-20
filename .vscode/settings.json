@@ -1,4 +1,5 @@
 {
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
     "files.associations": {
         "atomic": "cpp",
         "bit": "cpp",

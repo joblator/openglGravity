@@ -8,24 +8,27 @@
       "args": [
         "-g",
         "-std=c++17",
-        "-I${workspaceFolder}/include",
-        "-L${workspaceFolder}/lib",
-        "${workspaceFolder}/src/*.cpp",
-        "${workspaceFolder}/src/glad.c",
+        "-IC:/Users/User/Desktop/openglGravity/include",     // full include path
+        "src/main.cpp",
+        "src/glad.c",
+        "-LC:/Users/User/Desktop/openglGravity/lib",         // full lib path
         "-lglfw3dll",
         "-lopengl32",
-        "-o", "${workspaceFolder}/main.exe"
+        "-o",
+        "main.exe"
       ],
       "group": {
         "kind": "build",
         "isDefault": true
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
-      "label": "Run main.exe",
+      "label": "Run Executable",
       "type": "shell",
-      "command": "${workspaceFolder}/main.exe",
+      "command": "./main.exe",
       "dependsOn": "Build OpenGL Project",
       "group": {
         "kind": "test",
@@ -35,7 +38,7 @@
         "echo": true,
         "reveal": "always",
         "focus": true,
-        "panel": "new"
+        "panel": "shared"
       }
     }
   ]

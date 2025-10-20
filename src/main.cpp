@@ -7,23 +7,26 @@
 using namespace std;
 
 GLFWwindow* StartGLFW();
-int screenWidth = 1440;
-int screenHeight = 2560;
+int screenWidth = 800;
+int screenHeight = 1000;
 struct Ball
+
 {   
     // 0 = X , 1 = Y
     vector<float> pos;
     float radius;
     vector<float> accelration ,velocity;
     float mass;
+    vector<vector<float>> trail;
 
 
-    Ball(vector<float> Position,float r,vector<float> accel,vector<float> vel,float m){
+    Ball(vector<float> Position,float r,vector<float> accel,vector<float> vel,float m,vector<vector<float>> myTrail){
         radius = r;
         pos = Position;
         accelration = accel;
         velocity = vel;
         mass = m;
+        trail = myTrail;
         
     }
     void drawBall(int res){ 
@@ -113,7 +116,21 @@ struct Ball
         cout << "yAccel "<< yAccel << "\n";
 
         accelerate(xAccel,yAccel);
-        
+          
+    }
+    void updateTrail(){
+        trail.push_back({pos[0],pos[1]});
+        if (trail.size() > 500){
+            trail.erase(trail.begin());
+        }
+    }  
+    void trailDraw(){
+        glBegin(GL_LINE_STRIP);
+        glColor3f(0.0f, 0.0f, 1.0f);
+        for (auto& trailDot: trail){
+            glVertex2f(trailDot[0],trailDot[1]);
+        }
+        glEnd();
     }
 };
 
@@ -148,13 +165,13 @@ int main() {
     // Calculate orbital velocity magnitude for circular orbit
     float velocityMag = sqrt(G * M / orbitRadius);
     //ball(xpos,ypos,radius,accelration,velocity,mass)
-    Ball sun = Ball({centerX, centerY}, 30.0f, {0.0f, 0.0f}, {0.0f, 0.0f}, M);
+    Ball sun = Ball({centerX, centerY}, 30.0f, {0.0f, 0.0f}, {0.0f, 0.0f}, M,{{centerX, centerY}});
 
     // Planets positioned at 4 directions with tangential velocity for orbit
-    Ball planetRight = Ball({centerX + orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, velocityMag}, 1e14f);
-    Ball planetTop = Ball({centerX, centerY + orbitRadius}, 15.0f, {0.0f, 0.0f}, {-velocityMag, 0.0f}, 1e14f);
-    Ball planetLeft = Ball({centerX - orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, -velocityMag}, 1e14f);
-    Ball planetBottom = Ball({centerX, centerY - orbitRadius}, 15.0f, {0.0f, 0.0f}, {velocityMag, 0.0f}, 1e14f);
+    Ball planetRight = Ball({centerX + orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, velocityMag}, 1e14f,{{centerX + orbitRadius, centerY}});
+    Ball planetTop = Ball({centerX, centerY + orbitRadius}, 15.0f, {0.0f, 0.0f}, {-velocityMag, 0.0f}, 1e14f,{{centerX, centerY + orbitRadius}});
+    Ball planetLeft = Ball({centerX - orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, -velocityMag}, 1e14f,{{centerX - orbitRadius, centerY}});
+    Ball planetBottom = Ball({centerX, centerY - orbitRadius}, 15.0f, {0.0f, 0.0f}, {velocityMag, 0.0f}, 1e14f,{{centerX, centerY - orbitRadius}});
 
     vector<Ball> balls = {sun, planetRight, planetTop, planetLeft, planetBottom};
 
@@ -172,10 +189,12 @@ int main() {
                 if(&ball == &ball2){continue;}
                 ball.gravityForce(ball2);
             }
-            glColor3f(1.0f, 1.0f, 1.0f); 
+            glColor3f(1.0f, 1.0f, 1.0f); //rgb values between 1 and 0
             ball.move();
+            ball.updateTrail();
             ball.clampBall();
             ball.drawBall(res);
+            ball.trailDraw();
         }
         glfwSwapBuffers(window);
         glfwPollEvents();
