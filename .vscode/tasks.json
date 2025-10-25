@@ -8,10 +8,10 @@
       "args": [
         "-g",
         "-std=c++17",
-        "-IC:/Users/User/Desktop/openglGravity/include",     // full include path
+        "-I${workspaceFolder}/include",     // full include path
         "src/main.cpp",
         "src/glad.c",
-        "-LC:/Users/User/Desktop/openglGravity/lib",         // full lib path
+        "-L${workspaceFolder}/lib",         // full lib path
         "-lglfw3dll",
         "-lopengl32",
         "-o",

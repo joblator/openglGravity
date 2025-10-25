@@ -3,8 +3,11 @@
 #include <GLFW/glfw3.h>
 #include <cmath>
 #include <vector>
+#include <glm/vec2.hpp>
+#include <glm/geometric.hpp>
 
 using namespace std;
+using namespace glm;
 
 GLFWwindow* StartGLFW();
 int screenWidth = 800;
@@ -13,25 +16,28 @@ struct Ball
 
 {   
     // 0 = X , 1 = Y
-    vector<float> pos;
+    vec2 pos;
     float radius;
-    vector<float> accelration ,velocity;
+    vec2 accelration ,velocity;
     float mass;
     vector<vector<float>> trail;
+    float maxSpeed;
 
 
-    Ball(vector<float> Position,float r,vector<float> accel,vector<float> vel,float m,vector<vector<float>> myTrail){
+    Ball(vec2 Position,float r,vec2 accel,vec2 vel,float m,vector<vector<float>> myTrail){
         radius = r;
         pos = Position;
         accelration = accel;
         velocity = vel;
         mass = m;
         trail = myTrail;
+        maxSpeed = 0;
         
     }
     void drawBall(int res){ 
         glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(pos[0], pos[1]);  // center of circle
+        glColor3f(0.0f, 0.4f, 0.8f); //rgb values between 1 and 0
+        glVertex2f(pos[0], pos[1]); // center of circle 
 
         for (int i = 0; i <= res; i++) {
              // draws a triangle from the center of the circle each time at a diffrent angle 
@@ -45,21 +51,21 @@ struct Ball
     void clampBall(){
         if (pos[0] < radius){
             pos[0] = radius;
-            velocity[0] *= -0.1f;
+            velocity[0] *= -1.0f;
 
         }
         if (pos[0] > screenWidth - radius){
             pos[0] = screenWidth - radius;
-            velocity[0] *= -0.1f;
+            velocity[0] *= -1.0f;
         }
         if (pos[1] < radius){
             pos[1] = radius;
-            velocity[1] *= -0.1f;
+            velocity[1] *= -1.0f;
             
         }
         if (pos[1] > screenHeight - radius){
             pos[1] = screenHeight - radius;
-            velocity[1] *= -0.1f;
+            velocity[1] *= -1.0f;
         }
     }
 
@@ -69,6 +75,9 @@ struct Ball
     void accelerate(float x ,float y){
         velocity[0] += x;
         velocity[1] += y;
+        if (maxSpeed < velocity.length()){
+            maxSpeed = velocity.length();
+        }
     }
     void move(){
         pos[0] += velocity[0];
@@ -77,20 +86,26 @@ struct Ball
     
     
 
-    void collisionOther(Ball other){
-        if(abs(pos[1] - other.pos[1] < 2 * radius)){
-            if( pos[1] > other.pos[1]){
-                float temp  = velocity[1];
-                pos[1] = other.pos[1] + (2 * radius);
-                velocity[1] = 0.9f * velocity[1] + 0.75f * other.velocity[1];
-                other.velocity[1] =  0.9f * other.velocity[1] + 0.75f * temp;
-            }
-            else{
-                float temp  = velocity[1];
-                other.pos[1] = pos[1] - (2 * radius);
-                velocity[1] = 0.9f * velocity[1] + 0.75f * other.velocity[1];
-                other.velocity[1] =  0.9f * other.velocity[1] + 0.75f * temp;
-            }     
+    void collisionOther(Ball& other){
+        vec2 originalVelA =velocity;
+        vec2 originalVelB = other.velocity;
+        float dist = distance(pos,other.pos);
+        if(dist < radius + other.radius){
+            float overLap = (other.radius + radius)  - dist;
+            float massSum = mass + other.mass;
+            vec2 ImpactLine = normalize(other.pos - pos);
+            vec2 deltaVel =(other.velocity - velocity);
+            float numerator = dot(deltaVel,ImpactLine);
+            float denominator = massSum;
+            //calculating vA(this)
+            vec2 addVelA = 2 * other.mass *  numerator / denominator * ImpactLine;
+            velocity = originalVelA + addVelA;
+            //calculating vB(other)
+            vec2 addVelB = -2* mass * numerator / denominator * ImpactLine;
+            other.velocity = originalVelB + addVelB;
+        pos -=  ImpactLine * 0.5f * overLap;
+        other.pos +=  ImpactLine * 0.5f * overLap;
+    
         }
     }
 
@@ -99,13 +114,13 @@ struct Ball
         float G = 6.67f * pow(10,-14);
         float deltaY = other.pos[1] - pos[1];
         float deltaX = other.pos[0] - pos[0];
-        float distance = sqrt(pow(deltaX,2) + pow(deltaY,2));
-        cout << "distance: "<< distance << "\n";
-        if (distance > 100.f) {distance = 100.f;}
+        float dist = distance(pos,other.pos);
+        cout << "distance: "<< dist << "\n";
+        if (dist > 100.f) {dist = 100.f;}
 
 
-        vector<float> direction = {deltaX / distance,deltaY/distance};//scaling the vector
-        float Gforce = (G * mass * other.mass ) / (distance * distance);
+        vec2 direction = {deltaX / dist,deltaY/dist};//noramlizing the vector
+        float Gforce = (G * mass * other.mass ) / (dist * dist);
         cout << "Gforce: "<< Gforce << "\n";
         float accel = Gforce / mass;
         float xAccel = 0.01f * direction[0] * accel;
@@ -131,6 +146,18 @@ struct Ball
             glVertex2f(trailDot[0],trailDot[1]);
         }
         glEnd();
+    }
+    void lerp(){
+        float param =velocity.length();
+        float maxParam = maxSpeed;
+        float t = param / maxParam;
+        if(t > 1.0f) t = 1.0f;  // clamp to 1
+
+        float r = t;
+        float g = 0.0f;
+        float b = 1.0f - t;
+
+        glColor3f(r, g, b);
     }
 };
 
@@ -162,16 +189,14 @@ int main() {
     float centerX = screenWidth / 2.0f;  // 720 
     float centerY = screenHeight / 2.0f; // 1280
 
-    // Calculate orbital velocity magnitude for circular orbit
-    float velocityMag = sqrt(G * M / orbitRadius);
-    //ball(xpos,ypos,radius,accelration,velocity,mass)
+    //ball(pos,radius,accelration,velocity,mass,trail)
     Ball sun = Ball({centerX, centerY}, 30.0f, {0.0f, 0.0f}, {0.0f, 0.0f}, M,{{centerX, centerY}});
 
     // Planets positioned at 4 directions with tangential velocity for orbit
-    Ball planetRight = Ball({centerX + orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, velocityMag}, 1e14f,{{centerX + orbitRadius, centerY}});
-    Ball planetTop = Ball({centerX, centerY + orbitRadius}, 15.0f, {0.0f, 0.0f}, {-velocityMag, 0.0f}, 1e14f,{{centerX, centerY + orbitRadius}});
-    Ball planetLeft = Ball({centerX - orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, -velocityMag}, 1e14f,{{centerX - orbitRadius, centerY}});
-    Ball planetBottom = Ball({centerX, centerY - orbitRadius}, 15.0f, {0.0f, 0.0f}, {velocityMag, 0.0f}, 1e14f,{{centerX, centerY - orbitRadius}});
+    Ball planetRight = Ball({centerX + orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, 5.0f}, 1e14f,{{centerX + orbitRadius, centerY}});
+    Ball planetTop = Ball({centerX, centerY + orbitRadius}, 15.0f, {0.0f, 0.0f}, {-5.0f, 0.0f}, 1e14f,{{centerX, centerY + orbitRadius}});
+    Ball planetLeft = Ball({centerX - orbitRadius, centerY}, 15.0f, {0.0f, 0.0f}, {0.0f, -5.0f}, 1e14f,{{centerX - orbitRadius, centerY}});
+    Ball planetBottom = Ball({centerX, centerY - orbitRadius}, 15.0f, {0.0f, 0.0f}, {5.0f, 0.0f}, 1e14f,{{centerX, centerY - orbitRadius}});
 
     vector<Ball> balls = {sun, planetRight, planetTop, planetLeft, planetBottom};
 
@@ -180,22 +205,26 @@ int main() {
     int res = 100;
     // the physics loop 
     while (!glfwWindowShouldClose(window)) {
+        float Kenergy = 0;
         glClear(GL_COLOR_BUFFER_BIT);//clears the color buffer (screen) 
         glLoadIdentity();
         for (auto& ball: balls){
+
             ball.accelration[0] = 0.0f;
             ball.accelration[1] = 0.0f;
             for(auto& ball2 : balls){
                 if(&ball == &ball2){continue;}
                 ball.gravityForce(ball2);
+                ball.collisionOther(ball2);
             }
-            glColor3f(1.0f, 1.0f, 1.0f); //rgb values between 1 and 0
+            Kenergy += 0.5f * ball.mass *(ball.velocity[0] * ball.velocity[0] + ball.velocity[1] * ball.velocity[1]);
             ball.move();
-            ball.updateTrail();
             ball.clampBall();
+            ball.updateTrail();
             ball.drawBall(res);
             ball.trailDraw();
         }
+        cout << "energy: " << Kenergy << "\n";
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
